@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Table</title>
+    <style>
+        table {
+            width: 50%;
+            border-collapse: collapse;
+            margin-top: 5%;
+            margin-left: 5%;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        .button-deactivate, .button-delete {
+            padding: 5px 10px;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .button-deactivate {
+            background-color: orange;
+        }
+        .button-delete {
+            background-color: red;
+        }
+        .form{
+            margin-top: 5%;
+            margin-left: 6%;
+        }
+    </style>
+</head>
+<body>
+    <form class="form" method="get" action="">
+        <input type="text" name="search" value="{{ search_query }}" placeholder="Search by name or email">
+        <button type="submit">Search</button>
+    </form>
+    <table>
+        <tr>
+            <th>Username</th>
+            <th>Email</th>
+            <th>Deactivate</th>
+            <th>Delete</th>
+        </tr>
+        {% for user in users %}
+        <tr>
+            <td>{{ user.username }}</td>
+            <td>{{ user.email }}</td>
+            <td>
+                <button type="submit" value="Deactivate" class="button-deactivate" onclick="return confirm('Are you sure?');"><a href="{% url 'deactivate_user' user.id %}" style="color: black;">Deactivate</a></button>
+                
+            </td>
+            <td>
+               
+            <button type="submit" value="Delete" class="button-delete" onclick="return confirm('Are you sure?');"><a href="{% url 'delete_user' user.id %}" style="color: black;">Delete</a></button>
+            <!-- <input type="submit" value="Delete" class="button-delete" onclick="return confirm('Are you sure?');"> -->
+                
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

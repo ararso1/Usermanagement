@@ -1,0 +1,8 @@
+<h2>User Activity Logs</h2>
+<ul>
+    {% for log in logs %}
+    <li>{{ log.timestamp }}: {{ log.user.username }} - {{ log.action }}</li>
+    {% empty %}
+    <li>No activities logged.</li>
+    {% endfor %}
+</ul>
