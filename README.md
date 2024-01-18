@@ -1,1 +1,1 @@
-﻿# Usermanagement With Django and React
+﻿# Usermanagement With Django and Rest Frame Work API
