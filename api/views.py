@@ -19,6 +19,8 @@ from rest_framework.decorators import api_view, permission_classes, authenticati
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import SessionAuthentication
 from django.db.models import Q
+from rest_framework_simplejwt.tokens import RefreshToken
+
 
 # Create your views here.
 @api_view(['GET'])
@@ -36,6 +38,8 @@ def getRoutes(request):
         'update profile': 'update_profile',
         "add new user": "addnew_user",
         "change password": "change_password",
+        "delete user": "delete_user",
+        "deactivate user": "deactivate_user"
         }
     ]
     return Response(routes)
@@ -83,31 +87,28 @@ def lists_of_user(request):
 @api_view(['POST'])
 def user_login(request):
     if request.method != "POST":
-        # Handle non-POST requests, maybe return an error or redirect
         return HttpResponse("This view only handles POST requests.", status=400)
 
     headers = request.data
-    print(headers)
     username = headers.get('Username')
     password = headers.get('Password')
 
     if not username or not password:
-        # Handle the case where username or password is not provided
-        return HttpResponse("Username and password are required.", status=400)
+        return Response("Username and password are required.", status=400)
 
-    print(username, password)
     user = authenticate(request, username=username, password=password)
 
-    if user is not None:
+    if user is not None and user.is_active:
         login(request, user)
-        groups = request.user.groups.all()
-        if groups:
-            group = groups[0].name
-            if group == "normal_users":
-                return Response("Successfully logged in!")
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+            "userRole": "normal_users" if "normal_users" in [group.name for group in user.groups.all()] else "Admin",
+            "message":"Successfully logged in!"
+        })
     else:
-        # Handle the case where authentication fails
-        return Response("Invalid login credentials.")
+        return Response("Invalid login credentials.", status=401)
 
 
 @api_view(['POST'])
@@ -241,3 +242,41 @@ def change_password(request):
     user.save()
 
     return Response({'message': 'Password changed successfully.'}, status=status.HTTP_200_OK)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_user(request):
+    # Assuming username is used as an identifier
+    username = request.data.get('Username')
+
+    if request.user.username != username and not request.user.is_staff:
+        # Prevents users from deleting other users unless they are staff
+        return Response({'error': 'You do not have permission to delete this user.'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        user = User.objects.get(username=username)
+        user.delete()
+        return Response({'message': '{user.username} User deleted successfully.'}, status=status.HTTP_200_OK)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+    
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def deactivate_user(request):
+    # Assuming username is used as an identifier
+    username = request.data.get('username')
+
+    if request.user.username != username and not request.user.is_staff:
+        # Prevents users from deactivating other users unless they are staff
+        return Response({'error': 'You do not have permission to deactivate this user.'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        user = User.objects.get(username=username)
+        user.is_active = False
+        user.save()
+        return Response({'message': '{username} deactivated successfully.'}, status=status.HTTP_200_OK)
+    except User.DoesNotExist:
+        return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
