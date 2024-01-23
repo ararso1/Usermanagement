@@ -11,7 +11,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from rest_framework import status
 from django.contrib.auth.tokens import default_token_generator
-from django.utils.http import urlsafe_base64_encode
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode 
 from django.utils.encoding import force_bytes
 from .serializers import UserSerializer  # Adjust the import based on your project structure
 from .models import *
@@ -39,7 +39,8 @@ def getRoutes(request):
         "add new user": "addnew_user",
         "change password": "change_password",
         "delete user": "delete_user",
-        "deactivate user": "deactivate_user"
+        "deactivate user": "deactivate_user",
+        'reset password': "reset_password"
         }
     ]
     return Response(routes)
@@ -56,20 +57,22 @@ def signuppage(request):
         Username=headers['Username']
         Email = headers['Email']
         Password = headers['Password']
-
+       
         #ConfirmPassword = headers['confirm_password']
         try:
+            
             user=User.objects.create_user(username=Username, email=Email, password=Password)
             group = Group.objects.get(name='normal_users')
             user.groups.add(group)
             return Response([{"message":Username + " added successfully"}])
         except:
             return Response([{"message":Username + " Your account already exist!"}])
-        
+            
     return Response([{"status":1}])
 
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def lists_of_user(request):
     print("###################################3333")
     print(request.user.id)
@@ -83,7 +86,7 @@ def lists_of_user(request):
         di.append(d)
     return Response(di)
 
-
+    
 @api_view(['POST'])
 def user_login(request):
     if request.method != "POST":
@@ -92,7 +95,7 @@ def user_login(request):
     headers = request.data
     username = headers.get('Username')
     password = headers.get('Password')
-
+    print(headers)
     if not username or not password:
         return Response("Username and password are required.", status=400)
 
@@ -123,7 +126,7 @@ def forget_password(request):
             user = User.objects.get(email=email)
             token = default_token_generator.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
-            password_reset_url = f"http://127.0.0.1:8000/api/reset-password/{uid}/{token}"
+            password_reset_url = f"http://localhost:3000/changepassword/{uid}/{token}"
             
             print(password_reset_url)
             send_mail(
@@ -139,6 +142,42 @@ def forget_password(request):
             return Response({'error': 'User with this email does not exist'}, status=status.HTTP_400_BAD_REQUEST)
     else:
         return Response({'error': 'Only POST method is allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+
+@api_view(['POST'])
+def reset_password(request, uidb64, token):
+    try:
+        uid = urlsafe_base64_decode(uidb64).decode()
+        user = User.objects.get(pk=uid)
+
+        if default_token_generator.check_token(user, token):
+            # Assuming new password is sent in request.data
+            new_password = request.data.get('new_password')
+            user.set_password(new_password)
+            user.save()
+            return Response({'message': 'Password has been reset.'})
+        else:
+            return Response({'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        return Response({'error': 'Invalid request'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def reset_password(request, uidb64, token):
+    try:
+        uid = urlsafe_base64_decode(uidb64).decode()
+        user = User.objects.get(pk=uid)
+
+        if default_token_generator.check_token(user, token):
+            # Assuming new password is sent in request.data
+            new_password = request.data.get('new_password')
+            user.set_password(new_password)
+            user.save()
+            return Response({'message': 'Password has been reset.'})
+        else:
+            return Response({'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        return Response({'error': 'Invalid request'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
@@ -221,6 +260,7 @@ def user_list(request):
 
 @api_view(['POST'])
 def addnew_user(request):
+
     return redirect('signup')
 
 @api_view(['POST'])
@@ -244,38 +284,51 @@ def change_password(request):
     return Response({'message': 'Password changed successfully.'}, status=status.HTTP_200_OK)
 
 
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def delete_user(request):
-    # Assuming username is used as an identifier
-    username = request.data.get('Username')
+@api_view(['delete'])
 
-    if request.user.username != username and not request.user.is_staff:
-        # Prevents users from deleting other users unless they are staff
-        return Response({'error': 'You do not have permission to delete this user.'}, status=status.HTTP_403_FORBIDDEN)
+def delete_user(request,id):
+    # Assuming id is used as an identifier
+    #username = request.data.get('Usersname')
+    user = User.objects.get(id=id)
+    print("hhhhhhhhhhhhhhhhhhhhhh", user)
+    """     if request.user.username != username and not request.user.is_staff:
+            # Prevents users from deleting other users unless they are staff
+            return Response({'error': 'You do not have permission to delete this user.'}, status=status.HTTP_403_FORBIDDEN)
+    """
 
     try:
-        user = User.objects.get(username=username)
+        user = User.objects.get(id=id)
+        name = user.username
+        print(name)
         user.delete()
-        return Response({'message': '{user.username} User deleted successfully.'}, status=status.HTTP_200_OK)
+        return Response({'message': '{name} User deleted successfully.'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
     
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def deactivate_user(request):
+@api_view(['GET'])
+#@permission_classes([IsAuthenticated])
+def deactivate_user(request, id):
     # Assuming username is used as an identifier
-    username = request.data.get('username')
+    #username = request.data.get('username')
 
-    if request.user.username != username and not request.user.is_staff:
-        # Prevents users from deactivating other users unless they are staff
-        return Response({'error': 'You do not have permission to deactivate this user.'}, status=status.HTTP_403_FORBIDDEN)
+    user = User.objects.get(id=id)
+    print("hhhhhhhhhhhhhhhhhhhhhh", user)
+    """     if request.user.username != username and not request.user.is_staff:
+            # Prevents users from deactivating other users unless they are staff
+            return Response({'error': 'You do not have permission to deactivate this user.'}, status=status.HTTP_403_FORBIDDEN)
+    """
 
     try:
-        user = User.objects.get(username=username)
-        user.is_active = False
-        user.save()
+        user = User.objects.get(id=id)
+        print(user.is_active)
+        if user.is_active == False:
+            user.is_active = True
+            user.save()
+        else: 
+            user.is_active = False
+            user.save()
+        print(user.is_active)
         return Response({'message': '{username} deactivated successfully.'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)

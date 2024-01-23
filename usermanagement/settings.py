@@ -17,7 +17,6 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -27,7 +26,7 @@ SECRET_KEY = 'django-insecure-4^a4o)ew6)w_#48hr0*tny)gnxpij$_(0z2gv7d(!yivc&cekz
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['192.168.0.107','127.0.0.1']
+ALLOWED_HOSTS = ['192.168.0.107','127.0.0.1', '192.168.0.252']
 
 
 # Application definition
@@ -72,6 +71,7 @@ MIDDLEWARE = [
 ]
 
 CORS_ORIGIN_ALLOW_ALL = True
+
 
 ROOT_URLCONF = 'usermanagement.urls'
 
@@ -167,9 +167,9 @@ EMAIL_HOST_PASSWORD = 'Abdurhaman1@'
 DEFAUL_FROM_EMAIL = 'csolve12022@gmail.com' """
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'mail.delacruzet.com'
+EMAIL_HOST = 'smtp.ethereal.email'
 EMAIL_PORT = 587  # For non-SSL SMTP
-EMAIL_USE_TLS = False  # Disable TLS for non-SSL connection
-EMAIL_HOST_USER = 'ararso@delacruzet.com'
-EMAIL_HOST_PASSWORD = 'ararso1@'  # Replace with the actual password
-DEFAULT_FROM_EMAIL = 'ararso@delacruzet.com'
+EMAIL_USE_TLS = True  # Disable TLS for non-SSL connection
+EMAIL_HOST_USER = 'lukas.rohan6@ethereal.email'
+EMAIL_HOST_PASSWORD = '4BQWj6U6daV3g9MKDV'  # Replace with the actual password
+#DEFAULT_FROM_EMAIL = 'ararso@delacruzet.com'
