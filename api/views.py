@@ -40,7 +40,7 @@ def getRoutes(request):
         "change password": "change_password",
         "delete user": "delete_user",
         "deactivate user": "deactivate_user",
-        'reset password': "reset_password"
+        'reset password': "reset_password",
         }
     ]
     return Response(routes)
@@ -144,35 +144,22 @@ def forget_password(request):
         return Response({'error': 'Only POST method is allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
 
+
 @api_view(['POST'])
-def reset_password(request, uidb64, token):
+def reset_password(request):
+    uidb64 = request.data.get("userId")
+    token = request.data.get("token")
+    
     try:
         uid = urlsafe_base64_decode(uidb64).decode()
         user = User.objects.get(pk=uid)
 
         if default_token_generator.check_token(user, token):
             # Assuming new password is sent in request.data
-            new_password = request.data.get('new_password')
+            new_password = request.data.get('newPassword')
             user.set_password(new_password)
             user.save()
-            return Response({'message': 'Password has been reset.'})
-        else:
-            return Response({'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
-    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-        return Response({'error': 'Invalid request'}, status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(['POST'])
-def reset_password(request, uidb64, token):
-    try:
-        uid = urlsafe_base64_decode(uidb64).decode()
-        user = User.objects.get(pk=uid)
-
-        if default_token_generator.check_token(user, token):
-            # Assuming new password is sent in request.data
-            new_password = request.data.get('new_password')
-            user.set_password(new_password)
-            user.save()
+            print("doneeeeeeeeeeeeeeee")
             return Response({'message': 'Password has been reset.'})
         else:
             return Response({'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
@@ -198,43 +185,43 @@ def user_profile(request):
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
+
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def update_profile(request):
-    if request.method == "POST":
-        user = request.user
-        if user is not None:
-
-            data = request.data
-
-            first_name = data.get('first_name')
-            last_name = data.get('last_name')
-            email = data.get('email')
-            gender = data.get('gender')
-            phone = data.get('phone')
-            photo = data.get('photo')  # Handling file upload requires additional setup
-
-            # Update User model fields
-            user.first_name = first_name
-            user.last_name = last_name
-            user.email = email
-            user.save()
-
-            # Update or create UserProfile
-            User_Profile.objects.update_or_create(
-                user=user,
-                defaults={
-                    'gender': gender,
-                    'phone': phone,
-                    'photo': photo  # Ensure you handle file uploads correctly
-                }
-            )
-
-            return Response({'message': 'Profile updated successfully'}, status=status.HTTP_200_OK)
-        else: 
-            return Response({'error': 'User is not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+    user = request.user
+    print(user,'llllllllllllllllll')
+    if not user.is_authenticated:
+        return Response({'error': 'User is not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
 
     else:
-        return Response({'error': 'Only POST method is allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        data = request.data
+        print()
+        username = data.get('username')
+        first_name = data.get('firstName')
+        last_name = data.get('lastName')
+        location = data.get('location')
+        gender = data.get('gender')
+        phone = data.get('phone')
+        gender = data.get('gender')  # Handling file upload requires additional setup
+        print(username,"hhhhhhhhhhhhhhhhhhhh")
+        # Update User model fields
+        user.first_name = first_name
+        user.last_name = last_name
+        
+        #user.save()
+
+        # Update or create UserProfile
+        User_Profile.objects.update_or_create(
+            user=user,
+            defaults={
+                'gender': gender,
+                'phone': phone,
+                        # Ensure you handle file uploads correctly
+            }
+        )
+
+        return Response({'message': 'Profile updated successfully'}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
