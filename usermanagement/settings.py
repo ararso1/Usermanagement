@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-4^a4o)ew6)w_#48hr0*tny)gnxpij$_(0z2gv7d(!yivc&cekz
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['192.168.0.107','192.168.0.111','127.0.0.1', '192.168.0.252']
+ALLOWED_HOSTS = ['192.168.0.107','192.168.0.111','127.0.0.1','192.168.0.105', '192.168.0.252']
 
 
 # Application definition
@@ -44,8 +44,16 @@ INSTALLED_APPS = [
     'login_history',
     'rest_framework',
     'corsheaders',
+    'rest_framework.authtoken',
     
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+    ],
+    # Other DRF settings...
+}
 
 
 REST_FRAMEWORK = {

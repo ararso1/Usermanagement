@@ -13,13 +13,17 @@ from rest_framework import status
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode 
 from django.utils.encoding import force_bytes
-from .serializers import UserSerializer  # Adjust the import based on your project structure
+from .serializers import *  # Adjust the import based on your project structure
 from .models import *
 from rest_framework.decorators import api_view, permission_classes, authentication_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.authentication import SessionAuthentication
 from django.db.models import Q
 from rest_framework_simplejwt.tokens import RefreshToken
+from login_history.models import LoginHistory
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from django.contrib.auth.hashers import make_password
 
 
 # Create your views here.
@@ -41,6 +45,8 @@ def getRoutes(request):
         "delete user": "delete_user",
         "deactivate user": "deactivate_user",
         'reset password': "reset_password",
+        'get_user_activity': 'get_user_activity',
+        'user_profile_by_admin':'user_profile_by_admin'
         }
     ]
     return Response(routes)
@@ -64,7 +70,15 @@ def signuppage(request):
             user=User.objects.create_user(username=Username, email=Email, password=Password)
             group = Group.objects.get(name='normal_users')
             user.groups.add(group)
-            return Response([{"message":Username + " added successfully"}])
+            refresh = RefreshToken.for_user(user)
+
+            print(refresh)
+            return Response({
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+            "userRole": "normal_users" if "normal_users" in [group.name for group in user.groups.all()] else "Admin",
+            "message":Username + " added successfully"})
+            
         except:
             return Response([{"message":Username + " Your account already exist!"}])
             
@@ -118,7 +132,7 @@ def user_login(request):
 def forget_password(request):
     if request.method == "POST":
         headers = request.data
-        
+
         print(headers)
         email = headers.get('Email')  # Assuming the key is 'email' in the received data
 
@@ -131,7 +145,7 @@ def forget_password(request):
             print(password_reset_url)
             send_mail(
                 'Password Reset Request',
-                f'Please click on the link to reset your password: {password_reset_url}',
+                f'Please click on the link to reset your password: <a>{password_reset_url}</a>',
                 settings.EMAIL_HOST_USER,
                 [email],
                 fail_silently=False,
@@ -142,7 +156,6 @@ def forget_password(request):
             return Response({'error': 'User with this email does not exist'}, status=status.HTTP_400_BAD_REQUEST)
     else:
         return Response({'error': 'Only POST method is allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
-
 
 
 @api_view(['POST'])
@@ -167,64 +180,102 @@ def reset_password(request):
         return Response({'error': 'Invalid request'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['GET'])
-def user_profile(request):
-    if request.method == "GET":
-        #headers = request.data
-        username = request.user
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def user_profile(request):
+    # Using Token Authentication to authenticate user based on the access key
+
+    if request.method == "GET":
         try:
-            user = User.objects.get(username=username)
-            
-            if user.is_authenticated:
-                
-                serializer = UserSerializer(user)
-                return Response(serializer.data, status=status.HTTP_200_OK)
-            else:
-                return Response({'error': 'User is not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
+            # The user should be already authenticated by the TokenAuthentication
+            user = request.user
+            print()
+
+            serializer = UserSerializer(user)
+            print(serializer.data)
+            return Response(serializer.data, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET', 'PUT'])
+@permission_classes([IsAuthenticated])
+def user_profile_by_admin(request, user_id):
+    # Fetch the user or return 404 if not found
+    user = get_object_or_404(User, id=user_id)
+    print(user, 'jjjjjjjjjjjjjjjjjjjjjjjjjj')
+    if request.method == 'GET':
+        serializer = UserSerializer(user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    elif request.method == 'PUT':
+        data = request.data
+        username = data.get('Username')
+        password = data.get('Password')
+        email = data.get('Email')
+
+        user.username = username if username else user.username
+        user.email = email if email else user.email
+        if password:
+            user.password = make_password(password)  # Hash the new password
+
+        user.save()
+
+        return Response({'message': 'User updated successfully'}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_profile(request):
     user = request.user
-    print(user,'llllllllllllllllll')
+
+    print(user,'bbbbbbbbbbbbbbbbbbbbbbbbbbb')
     if not user.is_authenticated:
         return Response({'error': 'User is not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
-
-    else:
-        data = request.data
-        print()
-        username = data.get('username')
-        first_name = data.get('firstName')
-        last_name = data.get('lastName')
-        location = data.get('location')
-        gender = data.get('gender')
-        phone = data.get('phone')
-        gender = data.get('gender')  # Handling file upload requires additional setup
-        print(username,"hhhhhhhhhhhhhhhhhhhh")
-        # Update User model fields
-        user.first_name = first_name
-        user.last_name = last_name
-        
-        #user.save()
-
+    
+    data = request.data
+    first_name = data.get('firstName')
+    last_name = data.get('lastName')
+    location = data.get('location')
+    gender = data.get('gender')
+    phone = data.get('phone')
+    
+    birth_date = data.get('date')
+    photo = data.get('image')
+    print(photo)
+    email = data.get('email')
+    if email:
+        user.email = email
+    # Update User model fields
+    user.first_name = first_name
+    user.last_name = last_name
+    
+    user.save()
+    try:
         # Update or create UserProfile
         User_Profile.objects.update_or_create(
             user=user,
+            
             defaults={
+                'first_name':first_name,
+                'last_name':last_name,
                 'gender': gender,
                 'phone': phone,
-                        # Ensure you handle file uploads correctly
+                'location': location,
+                'birth_date': birth_date,
+                'photo':photo
+                # Ensure you handle file uploads correctly
             }
         )
-
         return Response({'message': 'Profile updated successfully'}, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
+#@permission_classes([IsAuthenticated])
 def user_list(request):
     search_query = request.data.get('search', '')  # Get the search parameter from the request data
 
@@ -250,6 +301,7 @@ def addnew_user(request):
 
     return redirect('signup')
 
+
 @api_view(['POST'])
 def change_password(request):
     user = request.user
@@ -272,21 +324,21 @@ def change_password(request):
 
 
 @api_view(['delete'])
-
 def delete_user(request,id):
     # Assuming id is used as an identifier
     #username = request.data.get('Usersname')
     user = User.objects.get(id=id)
     print("hhhhhhhhhhhhhhhhhhhhhh", user)
-    """     if request.user.username != username and not request.user.is_staff:
-            # Prevents users from deleting other users unless they are staff
-            return Response({'error': 'You do not have permission to delete this user.'}, status=status.HTTP_403_FORBIDDEN)
-    """
 
     try:
         user = User.objects.get(id=id)
-        name = user.username
-        print(name)
+        """print(user.is_active)
+        if user.is_active == False:
+            user.is_active = True
+            user.save()
+        else: 
+            user.is_active = False
+            user.save() """
         user.delete()
         return Response({'message': '{name} User deleted successfully.'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
@@ -301,10 +353,6 @@ def deactivate_user(request, id):
 
     user = User.objects.get(id=id)
     print("hhhhhhhhhhhhhhhhhhhhhh", user)
-    """     if request.user.username != username and not request.user.is_staff:
-            # Prevents users from deactivating other users unless they are staff
-            return Response({'error': 'You do not have permission to deactivate this user.'}, status=status.HTTP_403_FORBIDDEN)
-    """
 
     try:
         user = User.objects.get(id=id)
@@ -319,4 +367,18 @@ def deactivate_user(request, id):
         return Response({'message': '{username} deactivated successfully.'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['GET'])
+def get_user_activity(request, user_id):
+    print(user_id)
+    user_login_history = LoginHistory.objects.filter(user=user_id)
+    serializer = LoginHistorySerializer(user_login_history, many=True)
+    print(serializer.data)
+    return Response(serializer.data, content_type="application/json")
+
+
+
+
+
 

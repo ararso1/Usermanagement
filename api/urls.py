@@ -21,7 +21,8 @@ urlpatterns = [
     path('change_password', views.change_password, name='change_password'),
     path('delete_user/<str:id>/', views.delete_user, name='delete_user'),
     path('deactivate_user/<str:id>/', views.deactivate_user, name='deactivate_user'),
-    path('reset_password', views.reset_password, name='reset_password')    
-
+    path('reset_password', views.reset_password, name='reset_password'),    
+    path('get_user_activity/<str:user_id>', views.get_user_activity, name='get_user_activity'),
+    path('user_profile_by_admin/<str:user_id>', views.user_profile_by_admin, name='user_profile_by_admin'),
 ]
 

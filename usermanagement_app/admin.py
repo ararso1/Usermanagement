@@ -3,5 +3,5 @@ from .models import *
 
 # Register your models here.
 
-admin.site.register(UserProfile)
-admin.site.register(ActivityLog)
+#admin.site.register(UserProfile)
+#admin.site.register(ActivityLog)
