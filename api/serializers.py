@@ -5,7 +5,7 @@ from login_history.models import LoginHistory
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'is_active']  # Add other fields you want to include
+        fields = ['id', 'username', 'first_name', 'last_name','email','phone','photo','location','gender','is_active', ]  # Add other fields you want to include
 
 
 class LoginHistorySerializer(serializers.ModelSerializer):
