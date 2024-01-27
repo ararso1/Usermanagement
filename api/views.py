@@ -180,7 +180,6 @@ def reset_password(request):
         return Response({'error': 'Invalid request'}, status=status.HTTP_400_BAD_REQUEST)
 
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def user_profile(request):
