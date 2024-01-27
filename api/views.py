@@ -274,7 +274,7 @@ def update_profile(request):
 
 
 @api_view(['GET'])
-#@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated])
 def user_list(request):
     search_query = request.data.get('search', '')  # Get the search parameter from the request data
 
