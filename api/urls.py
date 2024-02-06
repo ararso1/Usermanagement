@@ -12,7 +12,7 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('endpoints', views.getRoutes, name='endpoints'),
     path('login', views.user_login, name='login'),
-    path('listofusers', views.lists_of_user, name='listofusers'),
+    
     path('forget_password', views.forget_password, name='forget_password'),
     path('user_profile', views.user_profile, name='user_profile'),
     path('update_profile', views.update_profile, name='update_profile'),

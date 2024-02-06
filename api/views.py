@@ -24,6 +24,9 @@ from login_history.models import LoginHistory
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.hashers import make_password
+from django.contrib.auth import get_user_model
+from django.contrib.contenttypes.models import ContentType
+
 
 
 # Create your views here.
@@ -60,14 +63,13 @@ def signuppage(request):
         print()
         print(headers)
         
-        Username=headers['Username']
-        Email = headers['Email']
+        Username=headers['Email']
         Password = headers['Password']
        
         #ConfirmPassword = headers['confirm_password']
         try:
             
-            user=User.objects.create_user(username=Username, email=Email, password=Password)
+            user=User.objects.create_user(username=Username, password=Password)
             group = Group.objects.get(name='normal_users')
             user.groups.add(group)
             refresh = RefreshToken.for_user(user)
@@ -85,7 +87,7 @@ def signuppage(request):
     return Response([{"status":1}])
 
 
-@api_view(['GET'])
+""" @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def lists_of_user(request):
     print("###################################3333")
@@ -98,9 +100,9 @@ def lists_of_user(request):
         d["username"]=j.username
         d["email"]=j.email
         di.append(d)
-    return Response(di)
+    return Response(di) """
 
-    
+
 @api_view(['POST'])
 def user_login(request):
     if request.method != "POST":
@@ -115,17 +117,23 @@ def user_login(request):
 
     user = authenticate(request, username=username, password=password)
 
-    if user is not None and user.is_active:
+    # Retrieve the user's profile to check the is_deleted field
+    try:
+        user_profile = User_Profile.objects.get(user=user)
+    except User_Profile.DoesNotExist:
+        user_profile = None
+
+    if user is not None and user.is_active and not (user_profile and user_profile.is_deleted):
         login(request, user)
         refresh = RefreshToken.for_user(user)
         return Response({
             'refresh': str(refresh),
             'access': str(refresh.access_token),
             "userRole": "normal_users" if "normal_users" in [group.name for group in user.groups.all()] else "Admin",
-            "message":"Successfully logged in!"
+            "message": "Successfully logged in!"
         })
     else:
-        return Response("Invalid login credentials.", status=401)
+        return Response("Invalid login credentials or account is deleted.", status=401)
 
 
 @api_view(['POST'])
@@ -138,20 +146,22 @@ def forget_password(request):
 
         try:
             user = User.objects.get(email=email)
-            token = default_token_generator.make_token(user)
-            uid = urlsafe_base64_encode(force_bytes(user.pk))
-            password_reset_url = f"http://localhost:3000/changepassword/{uid}/{token}"
-            
-            print(password_reset_url)
-            send_mail(
-                'Password Reset Request',
-                f'Please click on the link to reset your password: <a>{password_reset_url}</a>',
-                settings.EMAIL_HOST_USER,
-                [email],
-                fail_silently=False,
-            )
+            user_profile = User_Profile.objects.get(user=user)
+            if user is not None and user.is_active and not (user_profile and user_profile.is_deleted):
+                token = default_token_generator.make_token(user)
+                uid = urlsafe_base64_encode(force_bytes(user.pk))
+                password_reset_url = f"http://localhost:3000/changepassword/{uid}/{token}"
+                
+                print(password_reset_url)
+                send_mail(
+                    'Password Reset Request',
+                    f'Please click on the link to reset your password: <a>{password_reset_url}</a>',
+                    settings.EMAIL_HOST_USER,
+                    [email],
+                    fail_silently=False,
+                )
 
-            return Response({'message': 'Password reset link sent to your email'}, status=status.HTTP_200_OK)
+                return Response({'message': 'Password reset link sent to your email'}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
             return Response({'error': 'User with this email does not exist'}, status=status.HTTP_400_BAD_REQUEST)
     else:
@@ -224,47 +234,46 @@ def user_profile_by_admin(request, user_id):
         return Response({'message': 'User updated successfully'}, status=status.HTTP_200_OK)
 
 
+User = get_user_model()
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def update_profile(request):
     user = request.user
 
-    print(user,'bbbbbbbbbbbbbbbbbbbbbbbbbbb')
     if not user.is_authenticated:
         return Response({'error': 'User is not authenticated'}, status=status.HTTP_401_UNAUTHORIZED)
     
-    data = request.data
-    first_name = data.get('firstName')
-    last_name = data.get('lastName')
-    location = data.get('location')
-    gender = data.get('gender')
-    phone = data.get('phone')
+    # Non-file fields are in request.data
+    first_name = request.data.get('firstName')
+    last_name = request.data.get('lastName')
+    location = request.data.get('location')
+    gender = request.data.get('gender')
+    phone = request.data.get('phone')
+    birth_date = request.data.get('date')
+    email = request.data.get('email')
     
-    birth_date = data.get('date')
-    photo = data.get('image')
-    print(photo)
-    email = data.get('email')
+    # File fields should be in request.FILES
+    photo = request.FILES.get('image')
+
     if email:
         user.email = email
-    # Update User model fields
     user.first_name = first_name
     user.last_name = last_name
-    
     user.save()
+
     try:
-        # Update or create UserProfile
-        User_Profile.objects.update_or_create(
+
+        user_profile, created = User_Profile.objects.update_or_create(
             user=user,
-            
             defaults={
-                'first_name':first_name,
-                'last_name':last_name,
+                'first_name': first_name,
+                'last_name': last_name,
                 'gender': gender,
                 'phone': phone,
                 'location': location,
                 'birth_date': birth_date,
-                'photo':photo
-                # Ensure you handle file uploads correctly
+                'photo': photo  # Here, Django handles the file storage
             }
         )
         return Response({'message': 'Profile updated successfully'}, status=status.HTTP_200_OK)
@@ -283,7 +292,7 @@ def user_list(request):
     except Group.DoesNotExist:
         return Response({'error': 'Admin group not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    users = User.objects.exclude(groups=admin_group)
+    users = User.objects.exclude(groups=admin_group).filter(userprofile__is_deleted=False)
 
     # Apply search filter if search_query is not empty
     if search_query:
@@ -322,30 +331,24 @@ def change_password(request):
     return Response({'message': 'Password changed successfully.'}, status=status.HTTP_200_OK)
 
 
-@api_view(['delete'])
-def delete_user(request,id):
-    # Assuming id is used as an identifier
-    #username = request.data.get('Usersname')
-    user = User.objects.get(id=id)
-    print("hhhhhhhhhhhhhhhhhhhhhh", user)
-
+@api_view(['DELETE'])
+def delete_user(request, id):
     try:
+        # Fetch the User instance
         user = User.objects.get(id=id)
-        """print(user.is_active)
-        if user.is_active == False:
-            user.is_active = True
-            user.save()
-        else: 
-            user.is_active = False
-            user.save() """
-        user.delete()
-        return Response({'message': '{name} User deleted successfully.'}, status=status.HTTP_200_OK)
+        
+        # Assuming there is a OneToOne relationship between User and UserProfile
+        user_profile, created = User_Profile.objects.get_or_create(user=user)
+        user_profile.is_deleted = True
+        user_profile.save()
+
+        return Response({'message': f'{user.username} User marked as deleted successfully.'}, status=status.HTTP_200_OK)
     except User.DoesNotExist:
         return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
     
 
 @api_view(['GET'])
-#@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated])
 def deactivate_user(request, id):
     # Assuming username is used as an identifier
     #username = request.data.get('username')
@@ -368,15 +371,19 @@ def deactivate_user(request, id):
         return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
 
+
+User = get_user_model()
+
 @api_view(['GET'])
+#@permission_classes([IsAuthenticated])
 def get_user_activity(request, user_id):
-    print(user_id)
-    user_login_history = LoginHistory.objects.filter(user=user_id)
-    serializer = LoginHistorySerializer(user_login_history, many=True)
+    user_content_type = ContentType.objects.get_for_model(User)
+    user_login_history = LogEntry.objects.filter(
+        content_type=user_content_type, object_id=user_id
+    )
+    serializer = LogEntrySerializer(user_login_history, many=True)
     print(serializer.data)
     return Response(serializer.data, content_type="application/json")
-
-
 
 
 
